@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>감정평가 검증지도</title>
+<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:12.5px;color:#222;display:flex;height:100vh;overflow:hidden}
+#side{width:500px;min-width:260px;flex:none;overflow:auto;border-right:1px solid #ccc;background:#f6f7f9}
+#split{width:6px;cursor:col-resize;background:#d5d9df;flex:none}#split:hover,#split.on{background:#1f5fbf}
+#main{flex:1;display:flex;position:relative;min-width:0}
+#map{flex:1;position:relative;min-width:0}
+#rvwrap{display:none;flex:1;position:relative;border-left:3px solid #ffd400;min-width:0}
+#rvwrap.on{display:block}
+#rvwrap.full{position:absolute;inset:0;z-index:50;border:0}
+#rv{position:absolute;inset:0}
+#rvbar{position:absolute;top:8px;right:8px;z-index:5;display:flex;gap:6px}
+#rvbar button{border:0;border-radius:4px;padding:6px 10px;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font-size:12px}
+#rvbar button:hover{background:#000}
+#rvinfo{position:absolute;top:8px;left:8px;z-index:5;background:rgba(0,0,0,.6);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px}
+header{padding:10px 14px;background:#20324d;color:#fff;position:sticky;top:0;z-index:5}
+header{padding-right:120px}header h1{font-size:15px;margin:0}#openBtn{position:absolute;right:10px;top:12px;background:#ffd400;color:#222;font-weight:bold;padding:5px 9px;border-radius:5px;cursor:pointer;font-size:12px}
+#empty{position:absolute;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(32,50,77,.55);color:#fff;font-size:16px;text-align:center;line-height:1.8;pointer-events:none}
+body.dragging #empty{display:flex;background:rgba(31,95,191,.6)}header .sub{font-size:11.5px;opacity:.85;margin-top:2px}
+nav{display:flex;background:#fff;border-bottom:1px solid #ccc;position:sticky;top:47px;z-index:5}
+nav button{flex:1;border:0;background:#fff;padding:8px;cursor:pointer;font-weight:bold;color:#555;border-bottom:3px solid transparent}
+nav button.on{color:#1f5fbf;border-bottom-color:#1f5fbf}
+.pane{display:none;padding:10px 12px}.pane.on{display:block}
+.card{background:#fff;border:1px solid #dcdfe4;border-left:5px solid #888;border-radius:6px;margin-bottom:9px;padding:8px 10px}
+.card h3{margin:0 0 5px;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.card h3 small{font-weight:normal;color:#666}
+.kv{display:grid;grid-template-columns:78px 1fr 78px 1fr;gap:2px 6px;font-size:12px}
+.kv b{color:#666;font-weight:normal}
+.price{font-size:13px;font-weight:bold;color:#b3261e}
+textarea.note{width:100%;min-height:44px;margin-top:6px;font-family:inherit;font-size:12px;border:1px solid #e0c97a;background:#fffbea;border-radius:4px;padding:4px 6px;resize:vertical}
+.notelbl{font-size:11px;color:#9a7b00;margin-top:5px}
+table.f{border-collapse:collapse;width:100%;font-size:12px;margin-top:4px}
+table.f th,table.f td{border:1px solid #ddd;padding:3px 5px}
+table.f th{background:#eef1f5;font-weight:normal;color:#444;width:84px;text-align:left}
+table.f td.v{width:70px;text-align:center;font-weight:bold}
+td.v.diff{color:#c25400;background:#fff4e5}
+.formula{margin-top:5px;padding:5px 7px;background:#f0f4fa;border-radius:4px;font-family:Consolas,monospace;font-size:11.5px;white-space:pre-wrap}
+.badge{display:inline-block;padding:1px 6px;border-radius:9px;color:#fff;font-size:11px;margin-right:4px}
+.warn{color:#c25400;font-weight:bold}.ok{color:#178a2e}
+.hint{color:#777;font-size:11.5px;line-height:1.5}
+fieldset{border:1px solid #ddd;border-radius:6px;margin:0 0 10px;padding:8px 10px;background:#fff}
+legend{font-weight:bold}
+#drop{border:2px dashed #999;border-radius:6px;padding:12px;text-align:center;background:#f3f6fb}
+#drop.over{background:#dde8fa}
+button.b{padding:5px 10px;margin:2px 4px 2px 0;cursor:pointer;border:1px solid #888;border-radius:4px;background:#fff}
+textarea.json{width:100%;height:240px;font-family:Consolas,monospace;font-size:11px}
+#status{color:#1f5fbf;white-space:pre-wrap;margin-top:4px}
+.rv{margin-top:5px;font-size:11.5px}.rv a{margin-right:8px;color:#1f5fbf;text-decoration:none;white-space:nowrap;cursor:pointer}
+.rv a.rvmain{background:#ffe14d;color:#222;padding:1px 7px;border-radius:9px;font-weight:bold}
+/* 지도 위 요소 */
+.ctl{position:absolute;z-index:10;background:#fff;border-radius:6px;box-shadow:0 1px 5px rgba(0,0,0,.35);font-size:12px}
+#tools{top:10px;left:10px;padding:4px;display:flex;flex-direction:column;gap:3px}
+#tools button{border:1px solid #ccd;background:#fff;border-radius:4px;padding:5px 9px;cursor:pointer;text-align:left;font-size:12px}
+#tools button.on{background:#1f5fbf;color:#fff;border-color:#1f5fbf}
+#tools button.rvon{background:#ffd400;color:#222;border-color:#e0b800;font-weight:bold}
+#legend{bottom:22px;right:10px;padding:6px 9px;line-height:1.6}
+#legend i{display:inline-block;width:22px;height:0;border-top:3px solid;vertical-align:middle;margin-right:4px}
+#legend s{display:inline-block;width:11px;height:11px;margin-right:4px;vertical-align:middle;text-decoration:none}
+#detail{display:none;top:10px;right:10px;width:380px;max-height:calc(100% - 60px);overflow:auto;padding:10px 12px}
+#detail .close{position:absolute;top:6px;right:9px;cursor:pointer;color:#888;font-size:14px}
+.lbl,.llbl{position:relative;background:rgba(255,255,255,.96);border:2px solid #444;border-radius:5px;padding:3px 18px 8px 7px;font-size:11px;line-height:1.4;white-space:nowrap;cursor:move;box-shadow:0 1px 4px rgba(0,0,0,.35);user-select:none;color:#222}
+.lbl{text-align:center}
+.lbl .p{color:#b3261e;font-weight:bold}
+.lbl .nt{color:#9a5b00;font-size:10.5px;max-width:220px;white-space:normal}
+.llbl .d{color:#c25400;font-weight:bold}.llbl .why{color:#777;font-size:10.5px}.llbl .res{font-weight:bold;margin-top:1px}
+.lbl.sized,.llbl.sized{white-space:normal;overflow:auto}
+.x{position:absolute;top:1px;right:4px;color:#999;cursor:pointer;font-size:11px}.x:hover{color:#d00}
+.rz{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,#999 50%,#999 60%,transparent 60%,transparent 72%,#999 72%,#999 82%,transparent 82%);border-bottom-right-radius:4px}
+.rvb{text-decoration:none;font-size:13px;cursor:pointer}
+.pin{min-width:24px;height:24px;padding:0 6px;border-radius:12px;font-size:12px;font-weight:bold;line-height:20px;text-align:center;white-space:nowrap;cursor:pointer;border:2px solid var(--c);box-shadow:0 0 0 2px #fff,0 2px 6px rgba(0,0,0,.6)}
+.pin.sel{background:var(--c);color:#fff}
+.pin.uns{background:#fff;color:var(--c);animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{0%,100%{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--c),0 2px 6px rgba(0,0,0,.6)}50%{box-shadow:0 0 0 2px #fff,0 0 0 9px rgba(255,255,255,0),0 2px 6px rgba(0,0,0,.6)}}
+.arrow{font-size:20px;line-height:20px;width:20px;text-align:center;text-shadow:0 0 3px #fff;pointer-events:none}
+.walker{width:44px;height:44px;position:relative;pointer-events:none}
+.walker .fan{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from -30deg,rgba(255,212,0,.75) 0 60deg,transparent 60deg)}
+.walker .man{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:20px}
+.rvlabel{background:rgba(255,255,255,.95);border:2px solid #333;border-radius:5px;padding:3px 8px;font-size:13px;font-weight:bold;white-space:nowrap}
+#keybox{position:fixed;inset:0;background:rgba(20,30,50,.85);display:none;align-items:center;justify-content:center;z-index:1000}
+#keybox>div{background:#fff;border-radius:8px;padding:20px 24px;width:460px;font-size:13px;line-height:1.6}
+#keybox input{width:100%;padding:7px;font-size:13px;margin:8px 0}
+@media print{#side{width:100%;overflow:visible}#main,nav,header,#split{display:none}.pane{display:block!important}body{display:block;height:auto;overflow:visible}}
+</style>
+</head>
+<body>
+<div id="keybox"><div>
+  <b style="font-size:15px">카카오 지도 JavaScript 키 입력</b><br>
+  카카오 개발자 사이트 → 내 앱 → [플랫폼 키] → <b>JavaScript 키</b>를 붙여넣으세요.<br>
+  <span class="hint">한 번 입력하면 이 PC 브라우저에 저장됩니다. 이 웹 주소가 카카오 [JavaScript SDK 도메인]에 등록되어 있어야 합니다.</span>
+  <input id="keyin" placeholder="JavaScript 키">
+  <button class="b" id="keyok" style="background:#1f5fbf;color:#fff;border-color:#1f5fbf">지도 열기</button>
+  <div id="keyerr" class="warn"></div>
+</div></div>
+
+<div id="side">
+  <header><h1 id="ttl">감정평가 검증지도</h1><div class="sub" id="ttlsub">평가데이터 파일을 불러오세요</div><label id="openBtn">📂 평가데이터 열기<input type="file" id="openData" accept=".json" hidden></label></header>
+  <nav><button data-p="p1" class="on">필지</button><button data-p="p2">비교 내역</button><button data-p="p3">특이사항·종합</button><button data-p="p4">데이터</button></nav>
+  <div class="pane on" id="p1"></div>
+  <div class="pane" id="p2"></div>
+  <div class="pane" id="p3"></div>
+  <div class="pane" id="p4">
+    <fieldset><legend>다른 평가서용 지적도형 불러오기</legend>
+      <div id="drop">연속지적도 SHP(.zip 또는 .shp+.dbf+.prj) 끌어다 놓기<br><input type="file" id="file" multiple accept=".zip,.shp,.dbf,.prj,.cpg"></div>
+      <div id="status"></div>
+    </fieldset>
+    <fieldset><legend>평가 데이터 (JSON)</legend>
+      <div class="hint">필지(parcels)·비교선(links)·특이사항을 여기서 고칠 수 있습니다. 고친 뒤 [적용].</div>
+      <textarea class="json" id="json"></textarea>
+      <button class="b" id="apply">적용</button>
+      <button class="b" id="saveJson">데이터 파일 저장</button>
+      <label class="b" style="display:inline-block">데이터 파일 불러오기<input type="file" id="loadJson" accept=".json" hidden></label>
+      <button class="b" id="saveGeo">GeoJSON 저장(QGIS)</button>
+      <button class="b" onclick="window.print()">인쇄</button>
+      <button class="b" id="resetPos">박스 위치·표시 초기화</button>
+      <button class="b" id="reset">불러온 데이터 닫기</button>
+      <button class="b" id="resetKey">카카오 키 다시 입력</button>
+    </fieldset>
+  </div>
+</div>
+<div id="split" title="끌어서 패널 폭 조절"></div>
+<div id="main">
+  <div id="map">
+    <div id="tools" class="ctl">
+      <button id="bSky" class="on">위성지도</button>
+      <button id="bCad">지적편집도</button>
+      <button id="bRv">🚶 로드뷰</button>
+      <button id="bUns">미선정 박스 보기</button>
+      <button id="bFit">전체 범위로</button>
+    </div>
+    <div id="legend" class="ctl"></div>
+    <div id="empty"><div><b style="font-size:20px">📂 평가데이터 파일(.json)을<br>여기에 끌어다 놓으세요</b><br><span style="font-size:13px">또는 왼쪽 위 [평가데이터 열기] · 파일은 이 PC에만 있고 웹에 올라가지 않습니다</span></div></div>
+    <div id="detail" class="ctl"><span class="close" onclick="hideDetail()">✕</span><div id="detailBody"></div></div>
+  </div>
+  <div id="rvwrap">
+    <div id="rv"></div>
+    <div id="rvinfo"></div>
+    <div id="rvbar"><button id="rvFull">전체화면</button><button id="rvClose">✕ 로드뷰 닫기</button></div>
+  </div>
+</div>
+
+<script>
+const GEOM = {};
+const PANO = {};
+const COLORS={대상:'#d62728',표준지:'#1f5fbf',평가사례:'#2ca02c',거래사례:'#ff7f0e'};
+const STORE='appr_kmap_current';
+const clean=(k,v)=>k.startsWith('_')?undefined:v;
+let DATA=null;
+function absorb(d){if(d._geom){Object.assign(GEOM,d._geom);delete d._geom}if(d._pano){Object.assign(PANO,d._pano);delete d._pano}return d;}
+try{const s=JSON.parse(localStorage.getItem(STORE));if(s)DATA=absorb(s)}catch(e){}
+const fullData=()=>({...JSON.parse(JSON.stringify(DATA,clean)),_geom:GEOM,_pano:PANO});
+function persist(){if(!DATA)return;try{localStorage.setItem(STORE,JSON.stringify(fullData()))}catch(e){};document.getElementById('json').value=JSON.stringify(DATA,clean,1);}
+
+// ---------- 계산 ----------
+const pnuOf=p=>{let j=p.jibun,san=false;if(j.startsWith('산')){san=true;j=j.slice(1)}const[b,u='0']=j.split('-');return p.bjd+(san?'2':'1')+String(+b).padStart(4,'0')+String(+u).padStart(4,'0');};
+const ringsOf=g=>g.type==='Polygon'?[g.coordinates]:g.type==='MultiPolygon'?g.coordinates:[];
+function ringArea(r){const R=6378137,d=Math.PI/180;let a=0;for(let i=0;i<r.length-1;i++)a+=(r[i+1][0]-r[i][0])*d*(2+Math.sin(r[i][1]*d)+Math.sin(r[i+1][1]*d));return Math.abs(a*R*R/2);}
+const gArea=g=>ringsOf(g).reduce((s,p)=>s+p.reduce((t,r,i)=>t+(i?-1:1)*ringArea(r),0),0);
+function centroid(g){let x=0,y=0,n=0;for(const p of ringsOf(g)){const r=p[0];for(let i=0;i<r.length-1;i++){x+=r[i][0];y+=r[i][1];n++}}return[y/n,x/n];}
+function dist(a,b){const R=6371008,d=Math.PI/180,h=Math.sin((b[0]-a[0])*d/2)**2+Math.cos(a[0]*d)*Math.cos(b[0]*d)*Math.sin((b[1]-a[1])*d/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+function bearing(a,b){const d=Math.PI/180,y=Math.sin((b[1]-a[1])*d)*Math.cos(b[0]*d),x=Math.cos(a[0]*d)*Math.sin(b[0]*d)-Math.sin(a[0]*d)*Math.cos(b[0]*d)*Math.cos((b[1]-a[1])*d);return(Math.atan2(y,x)/d+360)%360;}
+const fmt=n=>n==null||n===''?'-':Number(n).toLocaleString();
+const fmtD=m=>m==null?'-':m>=1000?(m/1000).toFixed(2)+'km':Math.round(m)+'m';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nameOf=id=>(DATA.parcels.find(p=>p.id===id)||{}).name||id;
+const addrOf=p=>(((DATA.report&&DATA.report.sgg)||'')+' '+p.ri+' '+p.jibun).trim();
+const shortOf=p=>p.short||(p.type==='대상'?'대상':({표준지:'표',평가사례:'평',거래사례:'거'}[p.type]||'')+p.name.replace(/\s*\(.*\)/,'').replace(/^(표준지|평가사례|거래사례)\s*/,''));
+const isOne=v=>/^(1(\.0+)?|-|)$/.test(String(v).trim());
+const fv=(k,re)=>k.factors.find(f=>re.test(f[0]));
+const linkedIds=()=>new Set(DATA.links.flatMap(k=>[k.from,k.to]));
+const labelOn=p=>p.labelOn===undefined?linkedIds().has(p.id):p.labelOn;
+function linkBoxLines(k){
+  const L2=[];const reg=fv(k,/지역요인/);if(reg&&!isOne(reg[1]))L2.push(`<span class="d">지역요인 ${esc(reg[1])}</span>${reg[2]?' <span class="why">('+esc(reg[2])+')</span>':''}`);
+  const items=(k.detail||[]).filter(d=>!isOne(d[1]));
+  if(items.length){const ind=fv(k,/개별요인/);L2.push(`개별요인 <span class="d">${esc(ind?ind[1]:'')}</span> : `+items.map(d=>`${esc(d[0])} <span class="d">${esc(d[1])}</span>${d[2]?' <span class="why">('+esc(d[2])+')</span>':''}`).join(', '));}
+  else{const sp=[k.from,k.to].map(id=>DATA.parcels.find(p=>p.id===id)).find(p=>p&&p.type==='표준지');L2.push(`개별요인 1.000 (대등)`+(sp?` · 표준지 <b>${fmt(sp.price)}</b>원/㎡ <span class="why">(${esc(sp.dateShort||sp.date)})</span>`:''));}
+  const oth=fv(k,/그 ?밖|보정치/);if(oth)L2.push(`그 밖의 요인 <span class="d">${esc(oth[1])}</span>`);
+  return L2.map(s=>`<div>${s}</div>`).join('');
+}
+const dupRes=k=>{const o=fv(k,/그 ?밖|보정치/);const n=String(k.resultShort||'').replace(/[^0-9.]/g,'');return !!(o&&n&&!/원/.test(k.resultShort)&&String(o[1]).includes(n));};
+
+// ---------- 패널 HTML ----------
+let C={};
+function parcelHtml(p,popup){
+  const diff=p.area&&p._area?(p._area-p.area)/p.area*100:null;
+  const dtxt=diff==null?'<span class="warn">도형 없음</span>':`${fmt(Math.round(p._area))}㎡ (<span class="${Math.abs(diff)>5?'warn':'ok'}">${diff>0?'+':''}${diff.toFixed(1)}%</span>)`;
+  let h=(popup?`<b style="font-size:13.5px;color:${COLORS[p.type]}">${esc(p.name)}</b><br>`:'')+`<div class="kv">
+   <b>소재지</b><span>${esc(p.ri)} ${esc(p.jibun)}</span><b>지목</b><span>${esc(p.jimok)}</span>
+   <b>용도지역</b><span>${esc(p.zone)}</span><b>이용상황</b><span>${esc(p.use)}</span>
+   <b>도로교통</b><span>${esc(p.road||'-')}</span><b>형상·지세</b><span>${esc(p.shape||'-')}</span>
+   <b>면적(공부)</b><span>${fmt(p.area)}㎡</span><b>지적도형</b><span>${dtxt}</span>
+   <b>${esc(p.priceLabel)}</b><span class="price">${fmt(p.price)}원/㎡</span><b>시점</b><span>${esc(p.date)}</span>
+   ${p.extra?`<b>기타</b><span style="grid-column:2/5">${esc(p.extra)}</span>`:''}</div>`;
+  if(C[p.id]){const q=encodeURIComponent(addrOf(p));
+    h+=`<div class="rv"><a class="rvmain" onclick="openRvParcel('${p.id}')">🚶 로드뷰 보기</a><a onclick="zoomTo('${p.id}')">지도에서 보기</a><a target="_blank" rel="noopener" href="https://map.kakao.com/?q=${q}&map_type=TYPE_SKYVIEW&map_hybrid=true">카카오맵에서 열기</a></div>`;}
+  if(popup&&p.note)h+=`<div class="notelbl">특이사항</div><div style="background:#fffbea;padding:4px 6px;border-radius:4px">${esc(p.note)}</div>`;
+  if(popup){const ks=DATA.links.filter(k=>k.from===p.id||k.to===p.id);if(ks.length)h+=`<div class="hint" style="margin-top:4px">연결: ${ks.map(k=>esc(k.method)).join(', ')}</div>`;}
+  return h;
+}
+function linkBody(k){
+  return `<table class="f">${k.factors.map(f=>`<tr><th>${esc(f[0])}</th><td class="v ${f[3]?'diff':''}">${esc(f[1])}</td><td>${esc(f[2]||'')}</td></tr>`).join('')}</table>
+   ${k.detail?`<table class="f"><tr><th colspan="3" style="background:#f7f7f7">개별요인 세부 (${esc(k.detailTitle||'')})</th></tr>${k.detail.map(d=>`<tr><th>${esc(d[0])}</th><td class="v ${!isOne(d[1])?'diff':''}">${esc(d[1])}</td><td>${esc(d[2]||'')}</td></tr>`).join('')}</table>`:''}
+   <div class="formula">${esc(k.formula)}</div>`;
+}
+const linkHtml=k=>`<b style="color:${k.color};font-size:13.5px">${esc(k.method)}</b><br><span class="hint">${esc(nameOf(k.from))} → ${esc(nameOf(k.to))}</span>${linkBody(k)}${k.note?`<div class="notelbl">메모</div><div style="background:#fffbea;padding:4px 6px">${esc(k.note)}</div>`:''}`;
+function showDetail(html){document.getElementById('detailBody').innerHTML=html;document.getElementById('detail').style.display='block';}
+window.hideDetail=()=>{document.getElementById('detail').style.display='none'};
+
+function renderPanels(){
+  const R=DATA.report,tgt=DATA.parcels.find(p=>p.type==='대상');
+  document.getElementById('ttl').textContent=`${R.no} · ${R.address}`;
+  document.getElementById('ttlsub').textContent=`${R.purpose} · 기준시점 ${R.baseDate} · 감정평가액 ${fmt(R.value)}원 (${fmt(R.unit)}원/㎡)`;
+  document.getElementById('p1').innerHTML=DATA.parcels.map(p=>{
+    const d=tgt&&C[tgt.id]&&C[p.id]&&p!==tgt?dist(C[tgt.id],C[p.id]):null;
+    return `<div class="card" style="border-left-color:${COLORS[p.type]}"><h3 onclick="zoomTo('${p.id}')"><span>${esc(p.name)}${p.selected&&p.type!=='대상'?' ★':''}</span><small>${p.type!=='대상'?'대상까지 '+fmtD(d)+' · ':''}지도에서 보기 ›</small></h3>${parcelHtml(p,false)}
+    <div class="notelbl">특이사항</div><textarea class="note" data-id="${p.id}" placeholder="이 필지의 특이사항">${esc(p.note)}</textarea></div>`}).join('')
+    +'<div class="hint">★ = 평가서에서 실제 비교에 사용 · 면적 차이는 연속지적도 도형 기준(±5% 넘으면 주황)</div>';
+  document.getElementById('p2').innerHTML=DATA.links.map((k,i)=>`<div class="card" style="border-left-color:${k.color}"><h3 onclick="zoomLink(${i})"><span>${esc(k.method)}</span><small>${esc(nameOf(k.from))} → ${esc(nameOf(k.to))} · ${fmtD(C[k.from]&&C[k.to]?dist(C[k.from],C[k.to]):null)} ›</small></h3>${linkBody(k)}
+    <div class="notelbl">비교 메모</div><textarea class="note" data-link="${i}" placeholder="요인 비교 근거, 검증 시 확인사항 등">${esc(k.note)}</textarea></div>`).join('');
+  document.getElementById('p3').innerHTML=`
+   <div class="card" style="border-left-color:#d62728"><h3>대상 특이사항</h3><textarea class="note" style="min-height:90px" data-id="${tgt?tgt.id:''}">${esc(tgt?tgt.note:'')}</textarea></div>
+   <div class="card" style="border-left-color:#555"><h3>사례·표준지 특이사항 모아보기</h3>${DATA.parcels.filter(p=>p.type!=='대상').map(p=>`<div style="margin:4px 0"><span class="badge" style="background:${COLORS[p.type]}">${esc(p.name)}</span>${p.note?esc(p.note):'<span class="hint">없음</span>'}</div>`).join('')}</div>
+   <div class="card" style="border-left-color:#20324d"><h3>인근지역 참고자료</h3><div style="white-space:pre-wrap">${esc(R.marketInfo)}</div></div>
+   <div class="card" style="border-left-color:#20324d"><h3>검증 메모 · 종합 의견</h3><textarea class="note" style="min-height:110px" id="genNote" placeholder="검증 결과, 재검토 필요사항 등">${esc(R.note)}</textarea></div>`;
+  document.querySelectorAll('textarea.note').forEach(t=>t.addEventListener('input',()=>{
+    if(t.id==='genNote')DATA.report.note=t.value;
+    else if(t.dataset.link!=null)DATA.links[+t.dataset.link].note=t.value;
+    else{const p=DATA.parcels.find(x=>x.id===t.dataset.id);if(p)p.note=t.value;document.querySelectorAll(`textarea.note[data-id="${t.dataset.id}"]`).forEach(o=>{if(o!==t)o.value=t.value});}
+    persist();clearTimeout(window._rt);window._rt=setTimeout(()=>drawLabels(),900);
+  }));
+  persist();
+}
+
+// ---------- 카카오 지도 ----------
+let map,rv,rvc,K,proj;
+let shapes=[],labels=[],walker=null,rvLabels=[];
+const LL=a=>new K.LatLng(a[0],a[1]);
+function clearArr(a){a.forEach(o=>o.setMap(null));a.length=0;}
+
+function computeGeom(){C={};for(const p of DATA.parcels){const g=GEOM[pnuOf(p)];if(g){p._g=g;C[p.id]=centroid(g);p._area=gArea(g)}else{p._g=null;p._area=null}}}
+
+function drawShapes(){
+  clearArr(shapes);
+  for(const p of DATA.parcels){
+    if(!p._g)continue;const col=COLORS[p.type]||'#555',strong=p.selected||p.type==='대상';
+    for(const poly of ringsOf(p._g)){
+      const pg=new K.Polygon({map,path:poly.map(r=>r.map(c=>new K.LatLng(c[1],c[0]))),strokeWeight:strong?4:2,strokeColor:col,strokeOpacity:1,strokeStyle:strong?'solid':'dash',fillColor:col,fillOpacity:strong?.3:.45});
+      K.event.addListener(pg,'click',e=>{if(rvMode){openRvAt([e.latLng.getLat(),e.latLng.getLng()]);return;}p.labelOn=!labelOn(p);persist();drawLabels();});
+      shapes.push(pg);
+    }
+    const el=document.createElement('div');el.className='pin '+(strong?'sel':'uns');el.style.setProperty('--c',col);el.textContent=shortOf(p);el.title=p.name+' — 클릭: 박스 켜기/끄기';
+    el.addEventListener('click',e=>{e.stopPropagation();p.labelOn=!labelOn(p);persist();drawLabels();});
+    shapes.push(new K.CustomOverlay({map,position:LL(C[p.id]),content:el,zIndex:2}));
+  }
+  DATA.links.forEach((k,i)=>{
+    const a=C[k.from],b=C[k.to];if(!a||!b)return;
+    shapes.push(new K.Polyline({map,path:[LL(a),LL(b)],strokeWeight:7,strokeColor:'#fff',strokeOpacity:.7}));
+    const ln=new K.Polyline({map,path:[LL(a),LL(b)],strokeWeight:4,strokeColor:k.color,strokeOpacity:.95,strokeStyle:k.dash?'dash':'solid'});
+    K.event.addListener(ln,'click',()=>{k.labelOn=!(k.labelOn!==false);persist();drawLabels();});
+    shapes.push(ln);
+    const m=[a[0]+(b[0]-a[0])*.82,a[1]+(b[1]-a[1])*.82];
+    const ar=document.createElement('div');ar.className='arrow';ar.style.color=k.color;ar.style.transform=`rotate(${bearing(a,b)-90}deg)`;ar.textContent='➤';
+    shapes.push(new K.CustomOverlay({map,position:LL(m),content:ar,zIndex:3}));
+  });
+}
+
+// 이동·크기조절 가능한 박스
+function boxOverlay(anchor,pos,html,obj,color,onClick,onClose){
+  const wrap=document.createElement('div');wrap.innerHTML=html;const box=wrap.firstElementChild;
+  if(obj.labelSize){box.style.width=obj.labelSize[0]+'px';box.style.height=obj.labelSize[1]+'px';box.classList.add('sized');}
+  const ov=new K.CustomOverlay({map,position:LL(pos),content:box,xAnchor:.5,yAnchor:.5,zIndex:10});
+  const leader=new K.Polyline({map,path:[LL(anchor),LL(pos)],strokeWeight:1.5,strokeColor:color||'#333',strokeStyle:'shortdash',strokeOpacity:.9});
+  const dot=new K.Circle({map,center:LL(anchor),radius:2,strokeWeight:2,strokeColor:color,fillColor:color,fillOpacity:1});
+  labels.push(ov,leader,dot);
+  const sync=()=>{const pa=proj.containerPointFromCoords(LL(anchor)),pb=proj.containerPointFromCoords(ov.getPosition());const show=Math.hypot(pa.x-pb.x,pa.y-pb.y)>12;leader.setPath([LL(anchor),ov.getPosition()]);leader.setOptions({strokeOpacity:show?.9:0});dot.setOptions({strokeOpacity:show?1:0,fillOpacity:show?1:0});};
+  SYNC.push(sync);sync();
+  // 드래그
+  box.addEventListener('mousedown',ev=>{
+    if(ev.target.closest('.x,.rz,.rvb'))return;ev.stopPropagation();ev.preventDefault();
+    map.setDraggable(false);const sp=proj.containerPointFromCoords(ov.getPosition()),x0=ev.clientX,y0=ev.clientY;let moved=false;
+    const mv=e=>{const dx=e.clientX-x0,dy=e.clientY-y0;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;ov.setPosition(proj.coordsFromContainerPoint(new K.Point(sp.x+dx,sp.y+dy)));sync();};
+    const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);map.setDraggable(true);
+      if(moved){const p=ov.getPosition();obj.labelPos=[p.getLat(),p.getLng()];persist();}else onClick();};
+    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+  });
+  box.querySelector('.x').addEventListener('mousedown',e=>{e.stopPropagation();onClose();});
+  const rvb=box.querySelector('.rvb');if(rvb)rvb.addEventListener('mousedown',e=>{e.stopPropagation();rvb.click();});
+  // 크기조절
+  const rz=box.querySelector('.rz');
+  rz.addEventListener('mousedown',ev=>{ev.stopPropagation();ev.preventDefault();map.setDraggable(false);
+    const x0=ev.clientX,y0=ev.clientY,w0=box.offsetWidth,h0=box.offsetHeight;box.classList.add('sized');
+    const mv=e=>{box.style.width=Math.max(90,w0+2*(e.clientX-x0))+'px';box.style.height=Math.max(32,h0+2*(e.clientY-y0))+'px';};
+    const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);map.setDraggable(true);obj.labelSize=[parseInt(box.style.width),parseInt(box.style.height)];persist();};
+    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);});
+  rz.addEventListener('dblclick',e=>{e.stopPropagation();box.style.width='';box.style.height='';box.classList.remove('sized');delete obj.labelSize;persist();});
+}
+const SYNC=[];
+function drawLabels(){
+  clearArr(labels);SYNC.length=0;
+  for(const p of DATA.parcels){
+    if(!p._g||!labelOn(p))continue;const col=COLORS[p.type]||'#555';
+    const html=`<div class="lbl" style="border-color:${col}"><span class="x" title="닫기">✕</span><span class="rz" title="끌어서 크기 조절 · 더블클릭 원래 크기"></span><b style="color:${col}">${esc(p.name)}</b> <a class="rvb" title="로드뷰" onclick="openRvParcel('${p.id}')">🚶</a><br>${esc(p.zone)} · ${esc(p.use)}<br><span class="p">${fmt(p.price)}</span>원/㎡ · ${esc(p.dateShort||p.date)}${p.note?`<div class="nt">⚠ ${esc(p.note.length>40?p.note.slice(0,40)+'…':p.note)}</div>`:''}</div>`;
+    boxOverlay(C[p.id],p.labelPos||C[p.id],html,p,col,()=>showDetail(parcelHtml(p,true)),()=>{p.labelOn=false;persist();drawLabels();});
+  }
+  DATA.links.forEach(k=>{
+    const a=C[k.from],b=C[k.to];if(!a||!b||k.labelOn===false)return;
+    const mid=[a[0]+(b[0]-a[0])*.45,a[1]+(b[1]-a[1])*.45];
+    const html=`<div class="llbl" style="border-color:${k.color}"><span class="x" title="닫기">✕</span><span class="rz" title="끌어서 크기 조절 · 더블클릭 원래 크기"></span><b style="color:${k.color}">${esc(k.method)}</b> <span style="color:#777">(${fmtD(dist(a,b))})</span>${linkBoxLines(k)}${dupRes(k)?'':`<div class="res">→ ${esc(k.resultShort)}</div>`}</div>`;
+    boxOverlay(mid,k.labelPos||mid,html,k,k.color,()=>showDetail(linkHtml(k)),()=>{k.labelOn=false;persist();drawLabels();});
+  });
+}
+function fitAll(){if(!DATA)return;const bd=new K.LatLngBounds();Object.values(C).forEach(c=>bd.extend(LL(c)));if(!bd.isEmpty())map.setBounds(bd,60,60,60,60);}
+function render(fit){document.getElementById('empty').style.display=DATA?'none':'flex';if(!DATA){['p1','p2','p3'].forEach(i=>document.getElementById(i).innerHTML='<div class="hint">평가데이터 파일을 불러오면 표시됩니다.</div>');return;}computeGeom();drawShapes();drawLabels();renderPanels();if(fit)fitAll();}
+window.zoomTo=id=>{if(!C[id])return;const p=DATA.parcels.find(x=>x.id===id);if(p&&!labelOn(p)){p.labelOn=true;persist();drawLabels();}map.setLevel(2);map.setCenter(LL(C[id]));};
+window.zoomLink=i=>{const k=DATA.links[i];if(!C[k.from]||!C[k.to])return;const bd=new K.LatLngBounds();bd.extend(LL(C[k.from]));bd.extend(LL(C[k.to]));map.setBounds(bd,80,80,80,80);};
+
+// ---------- 로드뷰 ----------
+let rvMode=false,rvInit=false,rvTarget=null;
+function setRvMode(on){
+  rvMode=on;document.getElementById('bRv').classList.toggle('rvon',on);
+  document.getElementById('bRv').textContent=on?'🚶 로드뷰 켜짐 (파란 선 클릭)':'🚶 로드뷰';
+  if(on)map.addOverlayMapTypeId(K.MapTypeId.ROADVIEW);else map.removeOverlayMapTypeId(K.MapTypeId.ROADVIEW);
+}
+function showRv(){const w=document.getElementById('rvwrap');if(!w.classList.contains('on')){w.classList.add('on');setTimeout(()=>{map.relayout();rv.relayout();},50);}}
+function closeRv(){const w=document.getElementById('rvwrap');w.classList.remove('on','full');document.getElementById('rvFull').textContent='전체화면';setTimeout(()=>map.relayout(),50);if(walker){walker.setMap(null);walker=null;}rvTarget=null;}
+function setPano(panoId,pos,lookAt,title){
+  showRv();rvTarget=lookAt;
+  rv.setPanoId(panoId,LL(pos));
+  document.getElementById('rvinfo').textContent=title||'';
+}
+function openRvAt(ll,lookAt,title){
+  rvc.getNearestPanoId(LL(ll),80,id=>{
+    if(id===null){alert('근처(80m)에 로드뷰가 없습니다. 파란 선 위를 클릭하세요.');return;}
+    setPano(id,ll,lookAt,title);
+  });
+}
+window.openRvParcel=id=>{
+  const p=DATA.parcels.find(x=>x.id===id);if(!p||!C[id])return;
+  if(!rvMode)setRvMode(true);
+  const k=PANO[pnuOf(p)],title=`${p.name} — ${addrOf(p)}`;
+  if(k){const x=k.urlX/2.5,y=k.urlY/2.5;const pos=wcongToLL(x,y);setPano(k.panoid,pos,C[id],title);}
+  else openRvAt(C[id],C[id],title);
+};
+// EPSG:5181 → WGS84 (카카오 내부 좌표 근사 변환; 파노라마 위치 지정용)
+function wcongToLL(x,y){return tmToLL(x,y);}
+function tmToLL(x,y){ // GRS80 TM, lat0=38, lon0=127, FE=200000, FN=500000, k0=1
+  const a=6378137,f=1/298.257222101,e2=f*(2-f),k0=1,lat0=38*Math.PI/180,lon0=127*Math.PI/180;
+  const M=lat=>a*((1-e2/4-3*e2*e2/64-5*e2**3/256)*lat-(3*e2/8+3*e2*e2/32+45*e2**3/1024)*Math.sin(2*lat)+(15*e2*e2/256+45*e2**3/1024)*Math.sin(4*lat)-(35*e2**3/3072)*Math.sin(6*lat));
+  const M1=M(lat0)+(y-500000)/k0,mu=M1/(a*(1-e2/4-3*e2*e2/64-5*e2**3/256)),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const p1=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1*e1/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu)+(1097*e1**4/512)*Math.sin(8*mu);
+  const ep2=e2/(1-e2),C1=ep2*Math.cos(p1)**2,T1=Math.tan(p1)**2,N1=a/Math.sqrt(1-e2*Math.sin(p1)**2),R1=a*(1-e2)/(1-e2*Math.sin(p1)**2)**1.5,D=(x-200000)/(N1*k0);
+  const lat=p1-(N1*Math.tan(p1)/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*D**4/24+(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*D**6/720);
+  const lon=lon0+(D-(1+2*T1+C1)*D**3/6+(5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*D**5/120)/Math.cos(p1);
+  return[lat*180/Math.PI,lon*180/Math.PI];
+}
+function updateWalker(){
+  if(!document.getElementById('rvwrap').classList.contains('on'))return;
+  const pos=rv.getPosition(),vp=rv.getViewpoint();
+  if(!walker){const el=document.createElement('div');el.className='walker';el.innerHTML='<div class="fan"></div><div class="man">🚶</div>';walker=new K.CustomOverlay({map,position:pos,content:el,xAnchor:.5,yAnchor:.5,zIndex:20});}
+  walker.setPosition(pos);walker.getContent().querySelector('.fan').style.transform=`rotate(${vp.pan}deg)`;
+}
+function addRvLabels(){
+  rvLabels.forEach(o=>o.setMap(null));rvLabels=[];
+  for(const p of DATA.parcels){if(!C[p.id])continue;const el=document.createElement('div');el.className='rvlabel';el.style.borderColor=COLORS[p.type];el.innerHTML=`<span style="color:${COLORS[p.type]}">${esc(p.name)}</span> · ${fmt(p.price)}원/㎡`;
+    const o=new K.CustomOverlay({position:LL(C[p.id]),content:el,xAnchor:.5,yAnchor:.5});o.setMap(rv);rvLabels.push(o);}
+}
+
+// ---------- 초기화 ----------
+function initMap(){
+  K=kakao.maps;
+  map=new K.Map(document.getElementById('map'),{center:new K.LatLng(36.294,129.363),level:5});
+  map.setMapTypeId(K.MapTypeId.HYBRID);
+  map.addControl(new K.ZoomControl(),K.ControlPosition.RIGHT);
+  proj=map.getProjection();
+  K.event.addListener(map,'zoom_changed',()=>SYNC.forEach(f=>f()));
+  K.event.addListener(map,'click',e=>{if(rvMode)openRvAt([e.latLng.getLat(),e.latLng.getLng()]);});
+  rv=new K.Roadview(document.getElementById('rv'));rvc=new K.RoadviewClient();
+  K.event.addListener(rv,'init',()=>{if(!rvInit){addRvLabels();rvInit=true;}});
+  K.event.addListener(rv,'panoid_changed',()=>{setTimeout(()=>{if(rvTarget){const pos=rv.getPosition();rv.setViewpoint({pan:bearing([pos.getLat(),pos.getLng()],rvTarget),tilt:0,zoom:0});rvTarget=null;}updateWalker();},80);});
+  K.event.addListener(rv,'position_changed',updateWalker);
+  K.event.addListener(rv,'viewpoint_changed',updateWalker);
+  // 도구
+  const bSky=document.getElementById('bSky'),bCad=document.getElementById('bCad');
+  bSky.onclick=()=>{const on=!bSky.classList.contains('on');bSky.classList.toggle('on',on);map.setMapTypeId(on?K.MapTypeId.HYBRID:K.MapTypeId.ROADMAP);};
+  bCad.onclick=()=>{const on=!bCad.classList.contains('on');bCad.classList.toggle('on',on);on?map.addOverlayMapTypeId(K.MapTypeId.USE_DISTRICT):map.removeOverlayMapTypeId(K.MapTypeId.USE_DISTRICT);};
+  document.getElementById('bRv').onclick=()=>setRvMode(!rvMode);
+  let unsOn=false;document.getElementById('bUns').onclick=e=>{if(!DATA)return;unsOn=!unsOn;e.target.textContent=unsOn?'미선정 박스 숨기기':'미선정 박스 보기';const ids=linkedIds();DATA.parcels.forEach(p=>{if(!ids.has(p.id))p.labelOn=unsOn});persist();drawLabels();};
+  document.getElementById('bFit').onclick=fitAll;
+  document.getElementById('rvClose').onclick=closeRv;
+  document.getElementById('rvFull').onclick=e=>{const w=document.getElementById('rvwrap');const f=!w.classList.contains('full');w.classList.toggle('full',f);e.target.textContent=f?'지도와 나란히':'전체화면';setTimeout(()=>{map.relayout();rv.relayout();},50);};
+  document.getElementById('legend').innerHTML=Object.entries(COLORS).map(([k,c])=>`<s style="background:${c}"></s>${k}`).join(' ')+'<br>'+
+    [['공시지가기준법','#7b2cbf'],['그 밖의 요인 보정','#0f8b8d'],['거래사례비교법','#8c5a00']].map(([k,c])=>`<i style="border-color:${c}"></i>${k}`).join('<br>')+
+    '<br><span style="color:#777">색칠 핀 = 선정 · 흰 핀 = 미선정<br>필지·핀·선 클릭 = 박스 켜기/끄기<br>박스 끌기 = 이동 · 클릭 = 상세</span>';
+  render(true);
+}
+function loadKakao(key){
+  const s=document.createElement('script');
+  s.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false&libraries=services`;
+  s.onload=()=>{try{kakao.maps.load(()=>{document.getElementById('keybox').style.display='none';initMap();});}catch(e){keyFail('지도 로드 실패: '+e.message)}};
+  s.onerror=()=>keyFail('카카오 지도를 불러오지 못했습니다. 키, 도메인 등록('+location.origin+'), 카카오맵 사용 설정을 확인하세요.');
+  document.head.appendChild(s);
+}
+function keyFail(msg){document.getElementById('keybox').style.display='flex';document.getElementById('keyerr').textContent=msg;try{localStorage.removeItem('kakao_js_key')}catch(e){}}
+document.getElementById('keyok').onclick=()=>{const k=document.getElementById('keyin').value.trim();if(!k)return;try{localStorage.setItem('kakao_js_key',k)}catch(e){};location.reload();};
+document.getElementById('resetKey').onclick=()=>{try{localStorage.removeItem('kakao_js_key')}catch(e){};location.reload();};
+let KEY='';try{KEY=localStorage.getItem('kakao_js_key')||''}catch(e){}
+if(location.protocol==='file:'){document.getElementById('keybox').style.display='flex';document.getElementById('keybox').firstElementChild.innerHTML='<b style="font-size:15px">이 파일은 웹 주소로 열어야 합니다</b><br>카카오 지도는 등록된 웹 주소에서만 열립니다. GitHub Pages 주소(https://아이디.github.io/...)로 접속하세요.';}
+else if(!KEY){document.getElementById('keybox').style.display='flex';}
+else loadKakao(KEY);
+setTimeout(()=>{if(typeof kakao==='undefined'||!kakao.maps||!kakao.maps.Map){if(KEY&&location.protocol!=='file:')keyFail('지도 응답이 없습니다. 키·도메인·카카오맵 사용 설정을 확인하세요.');}},8000);
+
+// ---------- 탭·분할·데이터 ----------
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button,.pane').forEach(x=>x.classList.remove('on'));b.classList.add('on');document.getElementById(b.dataset.p).classList.add('on')});
+(()=>{const sp=document.getElementById('split'),side=document.getElementById('side');
+ try{const w=localStorage.getItem('appr_side_w');if(w)side.style.width=w+'px'}catch(e){}
+ sp.addEventListener('mousedown',e=>{e.preventDefault();sp.classList.add('on');
+  const mv=ev=>{side.style.width=Math.max(260,Math.min(window.innerWidth-300,ev.clientX))+'px';};
+  const up=()=>{sp.classList.remove('on');document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);try{localStorage.setItem('appr_side_w',side.offsetWidth)}catch(e){};if(map){map.relayout();if(rv)rv.relayout();}};
+  document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);});})();
+function setS(t){document.getElementById('status').textContent=t}
+function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();}
+document.getElementById('apply').onclick=()=>{if(!DATA)return;try{DATA=JSON.parse(document.getElementById('json').value);render(true);setS('적용했습니다.')}catch(e){setS('JSON 오류: '+e.message)}};
+document.getElementById('reset').onclick=()=>{try{localStorage.removeItem(STORE)}catch(e){};location.reload();};
+document.getElementById('resetPos').onclick=()=>{if(!DATA)return;[...DATA.parcels,...DATA.links].forEach(o=>{delete o.labelPos;delete o.labelOn;delete o.labelSize});persist();drawLabels();setS('박스 위치·크기·표시를 초기화했습니다.')};
+document.getElementById('saveJson').onclick=()=>{if(DATA)dl(`평가데이터_${DATA.report.no.replace(/\s/g,'_')}.json`,JSON.stringify(fullData(),null,1),'application/json');};
+async function openFile(f){try{const d=JSON.parse(await f.text());if(!d.parcels||!d.report)throw new Error('평가데이터 파일이 아닙니다');Object.keys(GEOM).forEach(k=>delete GEOM[k]);Object.keys(PANO).forEach(k=>delete PANO[k]);DATA=absorb(d);persist();if(map){closeRv();render(true);}setS('불러왔습니다: '+f.name);}catch(er){alert('파일 오류: '+er.message)}}
+document.getElementById('loadJson').onchange=e=>{if(e.target.files[0])openFile(e.target.files[0])};
+document.getElementById('openData').onchange=e=>{if(e.target.files[0])openFile(e.target.files[0])};
+document.addEventListener('dragover',e=>{if([...e.dataTransfer.items].some(i=>i.kind==='file')){e.preventDefault();document.body.classList.add('dragging')}});
+document.addEventListener('dragleave',e=>{if(!e.relatedTarget)document.body.classList.remove('dragging')});
+document.addEventListener('drop',e=>{document.body.classList.remove('dragging');const f=[...e.dataTransfer.files].find(x=>/\.json$/i.test(x.name));if(f&&!e.target.closest('#drop')){e.preventDefault();openFile(f);}});
+document.getElementById('saveGeo').onclick=()=>{
+  const fs=DATA.parcels.filter(p=>p._g).map(p=>({type:'Feature',geometry:p._g,properties:{구분:p.name,유형:p.type,PNU:pnuOf(p),지번:p.ri+' '+p.jibun,용도지역:p.zone,이용상황:p.use,단가:p.price,시점:p.date,선정:p.selected?'Y':'N',특이사항:p.note||''}}));
+  DATA.links.forEach(k=>{if(C[k.from]&&C[k.to])fs.push({type:'Feature',geometry:{type:'LineString',coordinates:[[C[k.from][1],C[k.from][0]],[C[k.to][1],C[k.to][0]]]},properties:{구분:k.method,결과:k.resultShort}})});
+  dl('표준지_사례.geojson',JSON.stringify({type:'FeatureCollection',features:fs}),'application/geo+json');};
+function findPnuKey(pr){for(const k of['PNU','pnu','A1'])if(k in pr)return k;for(const k in pr)if(/^\d{19}$/.test(String(pr[k]).trim()))return k;return null}
+async function handleFiles(files){files=[...files];if(!files.length||!DATA)return;setS('SHP 읽는 중… (수십 초 걸릴 수 있음)');await new Promise(r=>setTimeout(r,30));
+  try{let fc;const z=files.find(f=>/\.zip$/i.test(f.name));
+    if(z)fc=await shp(await z.arrayBuffer());
+    else{const g=e=>files.find(f=>f.name.toLowerCase().endsWith(e));const s=g('.shp'),d=g('.dbf'),p=g('.prj'),c=g('.cpg');if(!s||!d)throw new Error('.shp와 .dbf를 함께 선택하세요');
+      fc=shp.combine([shp.parseShp(await s.arrayBuffer(),p?await p.text():undefined),shp.parseDbf(await d.arrayBuffer(),c?await c.text():undefined)]);}
+    const want=new Set(DATA.parcels.map(pnuOf));let n=0;
+    for(const c of(Array.isArray(fc)?fc:[fc]))for(const f of c.features){const k=findPnuKey(f.properties);if(!k)continue;const v=String(f.properties[k]).trim();if(want.has(v)){GEOM[v]=f.geometry;n++}}
+    render(true);setS(`${n}/${want.size} 필지 도형을 찾았습니다.`);
+  }catch(e){setS('오류: '+e.message)}}
+const drop=document.getElementById('drop');
+['dragenter','dragover'].forEach(v=>drop.addEventListener(v,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(v=>drop.addEventListener(v,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>handleFiles(e.dataTransfer.files));
+document.getElementById('file').onchange=e=>handleFiles(e.target.files);
+</script>
+</body>
+</html>
