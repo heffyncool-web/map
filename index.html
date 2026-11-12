@@ -328,11 +328,20 @@ function setRvMode(on){
   document.getElementById('bRv').textContent=on?'🚶 로드뷰 켜짐 (파란 선 클릭)':'🚶 로드뷰';
   if(on)map.addOverlayMapTypeId(K.MapTypeId.ROADVIEW);else map.removeOverlayMapTypeId(K.MapTypeId.ROADVIEW);
 }
-function showRv(){const w=document.getElementById('rvwrap');if(!w.classList.contains('on')){w.classList.add('on');setTimeout(()=>{map.relayout();rv.relayout();},50);}}
+// 로드뷰는 칸이 화면에 보인 뒤에 만들어야 크기가 제대로 잡힘
+function ensureRv(){
+  if(rv)return;
+  rv=new K.Roadview(document.getElementById('rv'));
+  K.event.addListener(rv,'init',()=>{if(!rvInit){addRvLabels();rvInit=true;}});
+  K.event.addListener(rv,'panoid_changed',()=>{setTimeout(()=>{if(rvTarget){const pos=rv.getPosition();rv.setViewpoint({pan:bearing([pos.getLat(),pos.getLng()],rvTarget),tilt:0,zoom:0});rvTarget=null;}updateWalker();},80);});
+  K.event.addListener(rv,'position_changed',updateWalker);
+  K.event.addListener(rv,'viewpoint_changed',updateWalker);
+}
+function showRv(){document.getElementById('rvwrap').classList.add('on');map.relayout();ensureRv();rv.relayout();}
 function closeRv(){const w=document.getElementById('rvwrap');w.classList.remove('on','full');document.getElementById('rvFull').textContent='전체화면';setTimeout(()=>map.relayout(),50);if(walker){walker.setMap(null);walker=null;}rvTarget=null;}
 function setPano(panoId,pos,lookAt,title){
   showRv();rvTarget=lookAt;
-  rv.setPanoId(panoId,LL(pos));
+  requestAnimationFrame(()=>{map.relayout();rv.relayout();rv.setPanoId(panoId,LL(pos));});
   document.getElementById('rvinfo').textContent=title||'';
 }
 function openRvAt(ll,lookAt,title){
@@ -381,11 +390,7 @@ function initMap(){
   proj=map.getProjection();
   K.event.addListener(map,'zoom_changed',()=>SYNC.forEach(f=>f()));
   K.event.addListener(map,'click',e=>{if(rvMode)openRvAt([e.latLng.getLat(),e.latLng.getLng()]);});
-  rv=new K.Roadview(document.getElementById('rv'));rvc=new K.RoadviewClient();
-  K.event.addListener(rv,'init',()=>{if(!rvInit){addRvLabels();rvInit=true;}});
-  K.event.addListener(rv,'panoid_changed',()=>{setTimeout(()=>{if(rvTarget){const pos=rv.getPosition();rv.setViewpoint({pan:bearing([pos.getLat(),pos.getLng()],rvTarget),tilt:0,zoom:0});rvTarget=null;}updateWalker();},80);});
-  K.event.addListener(rv,'position_changed',updateWalker);
-  K.event.addListener(rv,'viewpoint_changed',updateWalker);
+  rvc=new K.RoadviewClient();
   // 도구
   const bSky=document.getElementById('bSky'),bCad=document.getElementById('bCad');
   bSky.onclick=()=>{const on=!bSky.classList.contains('on');bSky.classList.toggle('on',on);map.setMapTypeId(on?K.MapTypeId.HYBRID:K.MapTypeId.ROADMAP);};
@@ -394,7 +399,7 @@ function initMap(){
   let unsOn=false;document.getElementById('bUns').onclick=e=>{if(!DATA)return;unsOn=!unsOn;e.target.textContent=unsOn?'미선정 박스 숨기기':'미선정 박스 보기';const ids=linkedIds();DATA.parcels.forEach(p=>{if(!ids.has(p.id))p.labelOn=unsOn});persist();drawLabels();};
   document.getElementById('bFit').onclick=fitAll;
   document.getElementById('rvClose').onclick=closeRv;
-  document.getElementById('rvFull').onclick=e=>{const w=document.getElementById('rvwrap');const f=!w.classList.contains('full');w.classList.toggle('full',f);e.target.textContent=f?'지도와 나란히':'전체화면';setTimeout(()=>{map.relayout();rv.relayout();},50);};
+  document.getElementById('rvFull').onclick=e=>{const w=document.getElementById('rvwrap');const f=!w.classList.contains('full');w.classList.toggle('full',f);e.target.textContent=f?'지도와 나란히':'전체화면';setTimeout(()=>{map.relayout();if(rv)rv.relayout();},50);};
   document.getElementById('legend').innerHTML=Object.entries(COLORS).map(([k,c])=>`<s style="background:${c}"></s>${k}`).join(' ')+'<br>'+
     [['공시지가기준법','#7b2cbf'],['그 밖의 요인 보정','#0f8b8d'],['거래사례비교법','#8c5a00']].map(([k,c])=>`<i style="border-color:${c}"></i>${k}`).join('<br>')+
     '<br><span style="color:#777">색칠 핀 = 선정 · 흰 핀 = 미선정<br>필지·핀·선 클릭 = 박스 켜기/끄기<br>박스 끌기 = 이동 · 클릭 = 상세</span>';
