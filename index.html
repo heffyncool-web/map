@@ -54,6 +54,7 @@ button.b{padding:5px 10px;margin:2px 4px 2px 0;cursor:pointer;border:1px solid #
 textarea.json{width:100%;height:240px;font-family:Consolas,monospace;font-size:11px}
 #status{color:#1f5fbf;white-space:pre-wrap;margin-top:4px}
 .rv{margin-top:5px;font-size:11.5px}.rv a{margin-right:8px;color:#1f5fbf;text-decoration:none;white-space:nowrap;cursor:pointer}
+.rv a.ext{background:#eef3fb;border:1px solid #c9d7ef;padding:1px 7px;border-radius:9px;color:#1f4f99}
 .rv a.rvmain{background:#ffe14d;color:#222;padding:1px 7px;border-radius:9px;font-weight:bold}
 /* 지도 위 요소 */
 .ctl{position:absolute;z-index:10;background:#fff;border-radius:6px;box-shadow:0 1px 5px rgba(0,0,0,.35);font-size:12px}
@@ -171,6 +172,9 @@ const fmtD=m=>m==null?'-':m>=1000?(m/1000).toFixed(2)+'km':Math.round(m)+'m';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const nameOf=id=>(DATA.parcels.find(p=>p.id===id)||{}).name||id;
 const addrOf=p=>(((DATA.report&&DATA.report.sgg)||'')+' '+p.ri+' '+p.jibun).trim();
+const KRAS={'11':'seoul','26':'busan','27':'daegu','28':'incheon','29':'jeonnam-gwangju','46':'jeonnam-gwangju','30':'daejeon','31':'ulsan','36':'sejong','42':'gwd','51':'gwd','43':'chungbuk','44':'chungnam','45':'jeonbuk','52':'jeonbuk','47':'gb','48':'gyeongnam','50':'jeju'};
+const krasUrl=p=>{const s=p.bjd.slice(0,2);if(s==='41')return 'http://kras.gg.go.kr/';return KRAS[s]?`http://kras.${KRAS[s]}.go.kr/land_info/info/baseInfo/baseInfo.do`:'https://www.kras.go.kr';};
+window.copyText=(s,el)=>{const done=()=>{const o=el.textContent;el.textContent='✔ 복사됨';setTimeout(()=>el.textContent=o,1200)};try{navigator.clipboard.writeText(s).then(done,()=>prompt('복사하세요',s))}catch(e){prompt('복사하세요',s)}};
 const shortOf=p=>p.short||(p.type==='대상'?'대상':({표준지:'표',평가사례:'평',거래사례:'거'}[p.type]||'')+p.name.replace(/\s*\(.*\)/,'').replace(/^(표준지|평가사례|거래사례)\s*/,''));
 const isOne=v=>/^(1(\.0+)?|-|)$/.test(String(v).trim());
 const fv=(k,re)=>k.factors.find(f=>re.test(f[0]));
@@ -200,6 +204,7 @@ function parcelHtml(p,popup){
    ${p.extra?`<b>기타</b><span style="grid-column:2/5">${esc(p.extra)}</span>`:''}</div>`;
   if(C[p.id]){const q=encodeURIComponent(addrOf(p));
     h+=`<div class="rv"><a class="rvmain" onclick="openRvParcel('${p.id}')">🚶 로드뷰 보기</a><a onclick="zoomTo('${p.id}')">지도에서 보기</a><a target="_blank" rel="noopener" href="https://map.kakao.com/?q=${q}&map_type=TYPE_SKYVIEW&map_hybrid=true">카카오맵에서 열기</a></div>`;}
+  h+=`<div class="rv"><a class="ext" target="_blank" rel="noopener" href="https://www.eum.go.kr/web/ar/lu/luLandDet.jsp?pnu=${pnuOf(p)}&mode=search&isNoScr=script">📄 토지이용계획</a><a class="ext" target="_blank" rel="noopener" href="${krasUrl(p)}" title="일사편리는 바로가기를 막고 있어 조회 화면이 열립니다. 지번을 선택해 조회하세요.">🏛 일사편리</a><a class="ext" onclick="copyText('${esc(addrOf(p))}',this)" title="주소 복사">📋 주소복사</a></div>`;
   if(popup&&p.note)h+=`<div class="notelbl">특이사항</div><div style="background:#fffbea;padding:4px 6px;border-radius:4px">${esc(p.note)}</div>`;
   if(popup){const ks=DATA.links.filter(k=>k.from===p.id||k.to===p.id);if(ks.length)h+=`<div class="hint" style="margin-top:4px">연결: ${ks.map(k=>esc(k.method)).join(', ')}</div>`;}
   return h;
